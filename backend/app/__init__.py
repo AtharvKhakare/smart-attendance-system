@@ -1,6 +1,7 @@
 import click
 from flask import Flask
 from flask_cors import CORS
+from sqlalchemy import event
 from werkzeug.security import generate_password_hash
 
 from .config import Config
@@ -17,6 +18,20 @@ def create_app(config_class=Config) -> Flask:
     CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=False)
 
     db.init_app(app)
+    with app.app_context():
+        engine = db.engine
+    if engine.dialect.name == "postgresql":
+        schema = engine.dialect.identifier_preparer.quote(app.config["DATABASE_SCHEMA"])
+
+        @event.listens_for(engine, "connect")
+        def set_database_search_path(connection, _connection_record):
+            cursor = connection.cursor()
+            try:
+                cursor.execute(f"SET search_path TO {schema}")
+                connection.commit()
+            finally:
+                cursor.close()
+
     migrate.init_app(app, db)
     jwt.init_app(app)
 

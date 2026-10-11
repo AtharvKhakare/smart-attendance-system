@@ -1,7 +1,9 @@
 import os
+import re
 from datetime import timedelta
 from pathlib import Path
 
+from sqlalchemy.engine import make_url
 from dotenv import dotenv_values, load_dotenv
 
 # Resolve the backend environment file relative to this source file so Flask
@@ -35,6 +37,8 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
+    DATABASE_SCHEMA = os.getenv("DATABASE_SCHEMA", "public")
+    DATABASE_SCHEMA_EXPLICIT = os.getenv("DATABASE_SCHEMA") is not None
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(os.getenv("JWT_ACCESS_MINUTES", "30")))
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(os.getenv("JWT_REFRESH_DAYS", "7")))
     JWT_TOKEN_LOCATION = ["headers"]
@@ -58,6 +62,15 @@ class Config:
             raise RuntimeError("JWT_SECRET_KEY must be set to a different random value of at least 32 characters")
         if not cls.SQLALCHEMY_DATABASE_URI:
             raise RuntimeError("DATABASE_URL must be set before starting the API")
+        if not re.fullmatch(r"[a-z_][a-z0-9_]{0,62}", cls.DATABASE_SCHEMA):
+            raise RuntimeError("DATABASE_SCHEMA must be a lowercase PostgreSQL identifier of at most 63 characters")
+        database_url = make_url(cls.SQLALCHEMY_DATABASE_URI)
+        if (
+            database_url.get_backend_name() == "postgresql"
+            and database_url.host not in {None, "localhost", "127.0.0.1", "::1"}
+            and not cls.DATABASE_SCHEMA_EXPLICIT
+        ):
+            raise RuntimeError("Set DATABASE_SCHEMA explicitly before connecting to a remote PostgreSQL database")
         if not 0.0 < cls.FACE_MATCH_THRESHOLD < 1.0:
             raise RuntimeError("FACE_MATCH_THRESHOLD must be greater than 0 and less than 1")
         if not 0.0 <= cls.FACE_AMBIGUITY_MARGIN < 1.0:

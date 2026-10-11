@@ -26,7 +26,9 @@ def get_engine():
 
 def get_engine_url():
     try:
-        return get_engine().url.render_as_string(hide_password=False).replace(
+        # Alembic stores this URL in its config; redact the credential so it
+        # cannot appear in diagnostics or offline migration output.
+        return get_engine().url.render_as_string(hide_password=True).replace(
             '%', '%%')
     except AttributeError:
         return str(get_engine().url).replace('%', '%%')
