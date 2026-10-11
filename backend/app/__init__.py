@@ -13,7 +13,7 @@ def create_app(config_class=Config) -> Flask:
     app.config.from_object(config_class)
     config_class.validate()
 
-    origins = [origin.strip() for origin in __import__("os").getenv("CORS_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
+    origins = [origin.strip() for origin in app.config["CORS_ORIGINS"].split(",") if origin.strip()]
     CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=False)
 
     db.init_app(app)
